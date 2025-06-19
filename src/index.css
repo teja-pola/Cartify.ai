@@ -1,0 +1,230 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --walmart-blue: #0071ce;
+    --walmart-yellow: #ffc220;
+  }
+}
+
+@layer utilities {
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+}
+
+/* Walmart Brand Colors */
+.bg-walmart-blue {
+  background-color: #0071ce;
+}
+
+.bg-walmart-yellow {
+  background-color: #ffc220;
+}
+
+.text-walmart-blue {
+  color: #0071ce;
+}
+
+.text-walmart-yellow {
+  color: #ffc220;
+}
+
+.border-walmart-blue {
+  border-color: #0071ce;
+}
+
+.border-walmart-yellow {
+  border-color: #ffc220;
+}
+
+.hover\:bg-walmart-blue:hover {
+  background-color: #0071ce;
+}
+
+.hover\:bg-walmart-yellow:hover {
+  background-color: #ffc220;
+}
+
+.focus\:ring-walmart-blue:focus {
+  --tw-ring-color: #0071ce;
+}
+
+.focus\:border-walmart-blue:focus {
+  border-color: #0071ce;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Enhanced Animations */
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(-8%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 4s infinite;
+}
+
+/* Loading states */
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+/* Smooth transitions */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Enhanced Focus styles */
+button:focus {
+  outline: 3px solid #0071ce;
+  outline-offset: 2px;
+}
+
+input:focus {
+  outline: 3px solid #0071ce;
+  outline-offset: 2px;
+}
+
+/* Custom shadows with Walmart branding */
+.shadow-walmart {
+  box-shadow: 0 4px 6px -1px rgba(0, 113, 206, 0.1), 0 2px 4px -1px rgba(0, 113, 206, 0.06);
+}
+
+.shadow-walmart-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 113, 206, 0.1), 0 4px 6px -2px rgba(0, 113, 206, 0.05);
+}
+
+.shadow-walmart-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 113, 206, 0.1), 0 10px 10px -5px rgba(0, 113, 206, 0.04);
+}
+
+/* Enhanced button styles */
+.btn-primary {
+  @apply bg-[#0071ce] text-white font-bold py-3 px-6 rounded-full hover:bg-[#004c91] transition-all duration-200 shadow-lg;
+}
+
+.btn-secondary {
+  @apply bg-[#ffc220] text-black font-bold py-3 px-6 rounded-full hover:bg-yellow-300 transition-all duration-200 shadow-lg;
+}
+
+/* Card hover effects */
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-2xl hover:-translate-y-1;
+}
+
+/* Responsive design helpers */
+@media (max-width: 640px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* Animation delays for staggered effects */
+.animation-delay-1000 {
+  animation-delay: 1s;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+/* Gradient backgrounds */
+.gradient-walmart {
+  background: linear-gradient(135deg, #0071ce 0%, #004c91 100%);
+}
+
+.gradient-walmart-yellow {
+  background: linear-gradient(135deg, #ffc220 0%, #ffb000 100%);
+}
+
+/* Text gradients */
+.text-gradient-walmart {
+  background: linear-gradient(135deg, #0071ce 0%, #004c91 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Enhanced border styles */
+.border-3 {
+  border-width: 3px;
+}
+
+.border-4 {
+  border-width: 4px;
+}
+
+/* Modern glass effect */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Enhanced spacing utilities */
+.space-y-8 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 2rem;
+}
+
+/* Modern card styles */
+.modern-card {
+  @apply bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden;
+}
+
+/* Walmart-specific gradients for hero sections */
+.hero-gradient-1 {
+  background: linear-gradient(135deg, #0071ce 0%, #004c91 50%, #002d5a 100%);
+}
+
+.hero-gradient-2 {
+  background: linear-gradient(135deg, #ffc220 0%, #ffb000 50%, #ff9500 100%);
+}
