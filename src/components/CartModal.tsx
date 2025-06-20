@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { X, Plus, Minus, Trash2, ShoppingBag } from 'lucide-react'
 import { useStore } from '../store/useStore'
 
@@ -9,8 +9,8 @@ interface CartModalProps {
 export const CartModal: React.FC<CartModalProps> = ({ onClose }) => {
   const { cartItems, updateCartQuantity, removeFromCart, user } = useStore()
 
-  const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-  const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+  const cartTotal = cartItems.reduce((sum, item) => sum + ((item.price ?? 0) * (item.quantity ?? 0)), 0)
+  const cartItemCount = cartItems.reduce((sum, item) => sum + (item.quantity ?? 0), 0)
 
   const handleQuantityChange = (cartItemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -73,10 +73,10 @@ export const CartModal: React.FC<CartModalProps> = ({ onClose }) => {
                     <p className="text-sm text-gray-600 mb-3">{item.brand}</p>
                     <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
                       <span className="text-xl sm:text-2xl font-bold text-[#0071ce]">
-                        ${item.price.toFixed(2)}
+                        ${((item.price ?? 0).toFixed(2))}
                       </span>
                       <span className="text-sm text-gray-500 line-through">
-                        ${(item.price * 1.25).toFixed(2)}
+                        ${(((item.price ?? 0) * 1.25).toFixed(2))}
                       </span>
                       <span className="text-sm text-green-600 font-bold">
                         Save {Math.round(20)}%
@@ -87,14 +87,14 @@ export const CartModal: React.FC<CartModalProps> = ({ onClose }) => {
                   <div className="flex items-center justify-between w-full sm:w-auto sm:flex-col sm:space-y-4">
                     <div className="flex items-center border-2 border-gray-300 rounded-lg">
                       <button
-                        onClick={() => handleQuantityChange(item.cart_item_id, item.quantity - 1)}
+                        onClick={() => handleQuantityChange(item.cart_item_id, (item.quantity ?? 0) - 1)}
                         className="p-2 sm:p-3 hover:bg-gray-100 transition-colors"
                       >
                         <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
                       </button>
-                      <span className="px-4 sm:px-6 py-2 sm:py-3 font-bold text-base sm:text-lg">{item.quantity}</span>
+                      <span className="px-4 sm:px-6 py-2 sm:py-3 font-bold text-base sm:text-lg">{item.quantity ?? 0}</span>
                       <button
-                        onClick={() => handleQuantityChange(item.cart_item_id, item.quantity + 1)}
+                        onClick={() => handleQuantityChange(item.cart_item_id, (item.quantity ?? 0) + 1)}
                         className="p-2 sm:p-3 hover:bg-gray-100 transition-colors"
                       >
                         <Plus className="h-3 w-3 sm:h-4 sm:w-4" />

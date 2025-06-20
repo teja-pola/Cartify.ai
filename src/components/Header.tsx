@@ -12,8 +12,8 @@ export const Header: React.FC = () => {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
 
-  const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
-  const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const cartItemCount = cartItems.reduce((sum, item) => sum + (item.quantity ?? 0), 0)
+  const cartTotal = cartItems.reduce((sum, item) => sum + ((item.price ?? 0) * (item.quantity ?? 0)), 0)
 
   const handleAuthClick = (mode: 'signin' | 'signup') => {
     setAuthMode(mode)

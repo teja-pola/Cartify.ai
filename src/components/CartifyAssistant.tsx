@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { X, Mic, Send, ShoppingCart, Trash2, Plus, Minus, Bot, Sparkles, MicOff } from 'lucide-react'
 import { useStore } from '../store/useStore'
+import { supabase } from '../lib/supabase'
 
 interface CartifyProduct {
   id: string
@@ -27,6 +28,8 @@ export const CartifyAssistant: React.FC = () => {
   const [isListening, setIsListening] = useState(false)
   const [showQuickOptions, setShowQuickOptions] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([])
 
   const quickOptions: QuickOption[] = [
     {
@@ -85,107 +88,46 @@ export const CartifyAssistant: React.FC = () => {
     }
   }
 
-  // Enhanced product search function
-  const searchProducts = (query: string): CartifyProduct[] => {
-    const queryLower = query.toLowerCase()
-    const searchTerms = queryLower.split(' ')
-    
-    // Score products based on relevance
-    const scoredProducts = products.map(product => {
-      let score = 0
-      const productText = `${product.name} ${product.description} ${product.brand}`.toLowerCase()
-      
-      // Exact phrase match gets highest score
-      if (productText.includes(queryLower)) {
-        score += 10
-      }
-      
-      // Individual term matches
-      searchTerms.forEach(term => {
-        if (productText.includes(term)) {
-          score += 3
-        }
-        if (product.name.toLowerCase().includes(term)) {
-          score += 5 // Name matches are more important
-        }
-      })
-      
-      return { product, score }
-    })
-    
-    // Filter and sort by score
-    const relevantProducts = scoredProducts
-      .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 6) // Limit to 6 products
-      .map(item => ({
-        id: item.product.id,
-        name: item.product.name,
-        price: item.product.price,
-        image_url: item.product.image_url,
-        quantity: 1,
-        reason: `Matches your search for "${query}"`
-      }))
-    
-    return relevantProducts
-  }
+  const handleVoiceInput = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      setMediaRecorder(recorder)
+      const chunks: Blob[] = []
+      setAudioChunks(chunks)
 
-  // Enhanced AI processing with real product search
-  const processWithAI = async (input: string): Promise<CartifyProduct[]> => {
-    const inputLower = input.toLowerCase()
-    
-    // First try to find products using search
-    let foundProducts = searchProducts(input)
-    
-    // If no products found, try category-based search
-    if (foundProducts.length === 0) {
-      const categoryKeywords = {
-        'food': ['rice', 'bread', 'milk', 'chocolate', 'tea', 'coffee'],
-        'electronics': ['phone', 'tv', 'laptop', 'headphones', 'tablet'],
-        'home': ['candle', 'blanket', 'heater', 'vacuum', 'sheets'],
-        'beauty': ['cream', 'mascara', 'lotion'],
-        'clothing': ['shirt', 'jeans', 'shoes', 'jacket']
-      }
-      
-      for (const [category, keywords] of Object.entries(categoryKeywords)) {
-        if (keywords.some(keyword => inputLower.includes(keyword))) {
-          foundProducts = products
-            .filter(product => 
-              keywords.some(keyword => 
-                product.name.toLowerCase().includes(keyword) ||
-                product.description.toLowerCase().includes(keyword)
-              )
-            )
-            .slice(0, 4)
-            .map(product => ({
-              id: product.id,
-              name: product.name,
-              price: product.price,
-              image_url: product.image_url,
-              quantity: 1,
-              reason: `Perfect for ${category} needs`
-            }))
-          break
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data)
         }
       }
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' })
+        const formData = new FormData()
+        formData.append('audio', audioBlob, 'audio.webm')
+        const { data, error } = await supabase.functions.invoke('speechToText', {
+          body: formData,
+        })
+        console.log('Data from speechToText:', data)
+        if (error) {
+          console.error('Error from speechToText:', error)
+          alert('Failed to transcribe audio')
+          return
+        }
+        setInput(data.transcription)
+        setIsListening(false)
+      }
+
+      recorder.start()
+      setIsListening(true)
+      setTimeout(() => {
+        recorder.stop()
+      }, 5000)
+    } catch (error) {
+      console.error('Error accessing microphone:', error)
+      alert('Could not access microphone')
     }
-    
-    // If still no products, show popular items
-    if (foundProducts.length === 0) {
-      foundProducts = products
-        .sort((a, b) => b.rating - a.rating)
-        .slice(0, 3)
-        .map(product => ({
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          image_url: product.image_url,
-          quantity: 1,
-          reason: 'Popular item you might like'
-        }))
-    }
-    
-    return foundProducts
   }
 
   const handleSendMessage = async (customInput?: string) => {
@@ -196,29 +138,38 @@ export const CartifyAssistant: React.FC = () => {
     setIsProcessing(true)
     setShowQuickOptions(false)
 
-    // Add user message
     setMessages(prev => [...prev, { type: 'user', content: userMessage }])
 
     try {
-      // Simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const { data, error } = await supabase.functions.invoke('getSuggestedProducts', {
+        body: { query: userMessage },
+      })
+      console.log('Data from getSuggestedProducts:', data)
+      if (error) {
+        console.error('Error from getSuggestedProducts:', error)
+        throw new Error(error.message)
+      }
+      const suggestions = data.products
+      setSuggestedProducts(suggestions.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        image_url: p.image_url,
+        quantity: 1,
+        reason: `Matches your search for "${userMessage}"`
+      })))
 
-      // Get product suggestions using AI
-      const suggestions = await processWithAI(userMessage)
-      setSuggestedProducts(suggestions)
-
-      const totalCost = suggestions.reduce((sum, p) => sum + (p.price * p.quantity), 0)
+      const totalCost = suggestions.reduce((sum: number, p: any) => sum + (p.price * 1), 0)
       
-      let response = `Perfect! I found ${suggestions.length} items that match your needs:\n\n`
+      let responseText = `Perfect! I found ${suggestions.length} items that match your needs:\n\n`
       
-      suggestions.forEach((product, index) => {
-        response += `${index + 1}. ${product.name} - $${product.price.toFixed(2)}\n   ${product.reason}\n\n`
+      suggestions.forEach((product: any, index: number) => {
+        responseText += `${index + 1}. ${product.name} - $${product.price.toFixed(2)}\n\n`
       })
 
-      response += `💰 Total: $${totalCost.toFixed(2)}\n\nYou can adjust quantities or remove items you don't need. Click "Add All to Cart" when ready!`
+      responseText += `💰 Total: $${totalCost.toFixed(2)}\n\nYou can adjust quantities or remove items you don't need. Click "Add All to Cart" when ready!`
 
-      // Add bot response
-      setMessages(prev => [...prev, { type: 'bot', content: response }])
+      setMessages(prev => [...prev, { type: 'bot', content: responseText }])
       
     } catch (error) {
       setMessages(prev => [...prev, { 
@@ -227,35 +178,6 @@ export const CartifyAssistant: React.FC = () => {
       }])
     } finally {
       setIsProcessing(false)
-    }
-  }
-
-  const handleVoiceInput = () => {
-    if (!('webkitSpeechRecognition' in window)) {
-      alert('Voice input is not supported in your browser')
-      return
-    }
-
-    const recognition = new (window as any).webkitSpeechRecognition()
-    recognition.continuous = false
-    recognition.interimResults = false
-    recognition.lang = 'en-US'
-
-    setIsListening(true)
-    recognition.start()
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript
-      setInput(transcript)
-      setIsListening(false)
-    }
-
-    recognition.onerror = () => {
-      setIsListening(false)
-    }
-
-    recognition.onend = () => {
-      setIsListening(false)
     }
   }
 
@@ -275,7 +197,6 @@ export const CartifyAssistant: React.FC = () => {
 
   const addAllToCart = () => {
     suggestedProducts.forEach(product => {
-      // Find the actual product from our products store
       const fullProduct = products.find(p => p.id === product.id)
       if (fullProduct) {
         addToCart(fullProduct, product.quantity)
