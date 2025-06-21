@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
-import { Search, ShoppingCart, User, Menu, MapPin, Heart, ChevronDown, X } from 'lucide-react'
+import { Search, ShoppingCart, User, Menu, MapPin, Heart, ChevronDown, X,  Home, Tag } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { AuthModal } from './AuthModal'
 import { CartModal } from './CartModal'
+import { NavLink } from 'react-router-dom'
 
 export const Header: React.FC = () => {
   const { cartItems, searchQuery, setSearchQuery, user, signOut } = useStore()
@@ -12,8 +13,8 @@ export const Header: React.FC = () => {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
 
-  const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
-  const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const cartItemCount = cartItems.reduce((sum, item) => sum + (item.quantity ?? 0), 0)
+  const cartTotal = cartItems.reduce((sum, item) => sum + ((item.price ?? 0) * (item.quantity ?? 0)), 0)
 
   const handleAuthClick = (mode: 'signin' | 'signup') => {
     setAuthMode(mode)
@@ -25,6 +26,21 @@ export const Header: React.FC = () => {
     await signOut()
     setShowUserMenu(false)
   }
+
+  // Helper component for navigation links
+  const NavLinkHelper = ({ to, text, icon }: { to: string, text: string, icon?: React.ReactNode }) => (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        `flex items-center space-x-2 font-semibold transition-colors duration-200 ${
+          isActive ? 'text-[#0071ce]' : 'text-gray-600 hover:text-[#0071ce]'
+        }`
+      }
+    >
+      {icon}
+      <span>{text}</span>
+    </NavLink>
+  )
 
   return (
     <>
@@ -168,22 +184,11 @@ export const Header: React.FC = () => {
 
           {/* Mobile Menu */}
           {showMobileMenu && (
-            <div className="lg:hidden border-t border-blue-600 py-4">
-              <div className="space-y-3">
-                <button className="flex items-center space-x-3 w-full text-left py-2 hover:text-[#ffc220] transition-colors">
-                  <Menu className="h-4 w-4" />
-                  <span>Departments</span>
-                </button>
-                <a href="#" className="block py-2 hover:text-[#ffc220] transition-colors">Services</a>
-                <a href="#" className="block py-2 hover:text-[#ffc220] transition-colors font-bold">Grocery & Essentials</a>
-                <a href="#" className="block py-2 hover:text-[#ffc220] transition-colors">Fashion</a>
-                <a href="#" className="block py-2 hover:text-[#ffc220] transition-colors">Home</a>
-                <a href="#" className="block py-2 hover:text-[#ffc220] transition-colors">Electronics</a>
-                <a href="#" className="block py-2 hover:text-[#ffc220] transition-colors">Auto & Tires</a>
-                <a href="#" className="block py-2 hover:text-[#ffc220] transition-colors">Pharmacy</a>
-                <a href="#" className="block py-2 hover:text-[#ffc220] transition-colors">Trending</a>
-                <a href="#" className="block py-2 hover:text-[#ffc220] transition-colors">Registry</a>
-                <a href="#" className="block py-2 hover:text-[#ffc220] transition-colors">Walmart+</a>
+            <div className="lg:hidden bg-[#0071ce] border-t border-blue-600 py-4 px-2">
+              <div className="space-y-1">
+                <NavLinkHelper to="/" text="Home" icon={<Home className="w-5 h-5" />} />
+                <NavLinkHelper to="/deals"text="Deals" icon={<Tag className="w-5 h-5" />} />
+                <NavLinkHelper to="/account" text="My Account" icon={<User className="w-5 h-5" />} />
               </div>
             </div>
           )}

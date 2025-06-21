@@ -1,18 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { ArrowLeft, CreditCard, Lock, Truck, X } from 'lucide-react'
-
-interface CartItem {
-  cart_item_id: string
-  id: string
-  name: string
-  price: number
-  image_url: string
-  brand: string
-  quantity: number
-}
+import { useStore } from '../store/useStore'
+import { Link, useNavigate } from 'react-router-dom'
 
 export const CheckoutPage: React.FC = () => {
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const { cartItems, user } = useStore()
+  const navigate = useNavigate()
   const [paymentMethod, setPaymentMethod] = useState('card')
   const [shippingInfo, setShippingInfo] = useState({
     firstName: '',
@@ -31,18 +24,11 @@ export const CheckoutPage: React.FC = () => {
   })
 
   useEffect(() => {
-    // Get cart items from URL parameters
-    const urlParams = new URLSearchParams(window.location.search)
-    const itemsParam = urlParams.get('items')
-    if (itemsParam) {
-      try {
-        const items = JSON.parse(decodeURIComponent(itemsParam))
-        setCartItems(items)
-      } catch (error) {
-        console.error('Error parsing cart items:', error)
-      }
+    // If there's no user or the cart is empty, redirect to home
+    if (!user || cartItems.length === 0) {
+      navigate('/')
     }
-  }, [])
+  }, [user, cartItems, navigate])
 
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
   const shipping = subtotal > 35 ? 0 : 5.99
@@ -55,94 +41,90 @@ export const CheckoutPage: React.FC = () => {
     alert('Payment processing would be implemented here with Stripe!')
   }
 
-  const handleClose = () => {
-    window.close()
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4">
+        <div className="max-w-screen-md mx-auto px-2 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={handleClose}
-                className="flex items-center space-x-2 text-[#0071ce] hover:text-[#004c91] font-medium"
+            <div className="flex items-center space-x-2">
+              <Link
+                to="/"
+                className="flex items-center space-x-1 text-[#0071ce] hover:text-[#004c91] font-medium text-sm"
               >
                 <ArrowLeft className="h-5 w-5" />
-                <span>Back to Cart</span>
-              </button>
-              <div className="text-2xl font-bold text-gray-900">Checkout</div>
+                <span>Continue Shopping</span>
+              </Link>
+              <div className="text-lg font-bold text-gray-900">Checkout</div>
             </div>
-            <button
-              onClick={handleClose}
+            <Link
+              to="/"
               className="p-2 hover:bg-gray-100 rounded-full transition-colors"
             >
               <X className="h-5 w-5" />
-            </button>
+            </Link>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-screen-md mx-auto px-2 py-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Left Column - Forms */}
-          <div className="lg:col-span-2 space-y-8">
+          <div className="lg:col-span-2 space-y-4">
             {/* Shipping Information */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="flex items-center space-x-3 mb-6">
-                <Truck className="h-6 w-6 text-[#0071ce]" />
-                <h2 className="text-xl font-bold text-gray-900">Shipping Information</h2>
+            <div className="bg-white rounded-xl shadow p-3">
+              <div className="flex items-center space-x-2 mb-3">
+                <Truck className="h-5 w-5 text-[#0071ce]" />
+                <h2 className="text-base font-bold text-gray-900">Shipping Information</h2>
               </div>
               
-              <form className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">First Name</label>
                   <input
                     type="text"
                     value={shippingInfo.firstName}
                     onChange={(e) => setShippingInfo({...shippingInfo, firstName: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-xs"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Last Name</label>
                   <input
                     type="text"
                     value={shippingInfo.lastName}
                     onChange={(e) => setShippingInfo({...shippingInfo, lastName: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-xs"
                     required
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
                   <input
                     type="text"
                     value={shippingInfo.address}
                     onChange={(e) => setShippingInfo({...shippingInfo, address: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-xs"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">City</label>
                   <input
                     type="text"
                     value={shippingInfo.city}
                     onChange={(e) => setShippingInfo({...shippingInfo, city: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-xs"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">State</label>
                   <select
                     value={shippingInfo.state}
                     onChange={(e) => setShippingInfo({...shippingInfo, state: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-xs"
                     required
                   >
                     <option value="">Select State</option>
@@ -153,22 +135,22 @@ export const CheckoutPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">ZIP Code</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">ZIP Code</label>
                   <input
                     type="text"
                     value={shippingInfo.zipCode}
                     onChange={(e) => setShippingInfo({...shippingInfo, zipCode: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-xs"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
                   <input
                     type="tel"
                     value={shippingInfo.phone}
                     onChange={(e) => setShippingInfo({...shippingInfo, phone: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-xs"
                     required
                   />
                 </div>
@@ -176,19 +158,19 @@ export const CheckoutPage: React.FC = () => {
             </div>
 
             {/* Payment Information */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <div className="flex items-center space-x-3 mb-6">
-                <CreditCard className="h-6 w-6 text-[#0071ce]" />
-                <h2 className="text-xl font-bold text-gray-900">Payment Information</h2>
-                <Lock className="h-5 w-5 text-green-500" />
+            <div className="bg-white rounded-xl shadow p-3">
+              <div className="flex items-center space-x-2 mb-3">
+                <CreditCard className="h-5 w-5 text-[#0071ce]" />
+                <h2 className="text-base font-bold text-gray-900">Payment Information</h2>
+                <Lock className="h-4 w-4 text-green-500" />
               </div>
 
-              <div className="mb-6">
-                <div className="flex space-x-4">
+              <div className="mb-3">
+                <div className="flex space-x-2">
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('card')}
-                    className={`flex-1 p-4 border-2 rounded-lg font-medium transition-colors ${
+                    className={`flex-1 p-2 border rounded-lg font-medium text-xs transition-colors ${
                       paymentMethod === 'card'
                         ? 'border-[#0071ce] bg-blue-50 text-[#0071ce]'
                         : 'border-gray-300 text-gray-700'
@@ -199,7 +181,7 @@ export const CheckoutPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('paypal')}
-                    className={`flex-1 p-4 border-2 rounded-lg font-medium transition-colors ${
+                    className={`flex-1 p-2 border rounded-lg font-medium text-xs transition-colors ${
                       paymentMethod === 'paypal'
                         ? 'border-[#0071ce] bg-blue-50 text-[#0071ce]'
                         : 'border-gray-300 text-gray-700'
@@ -211,49 +193,49 @@ export const CheckoutPage: React.FC = () => {
               </div>
 
               {paymentMethod === 'card' && (
-                <form className="space-y-4">
+                <form className="space-y-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Card Number</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Card Number</label>
                     <input
                       type="text"
                       value={cardInfo.number}
                       onChange={(e) => setCardInfo({...cardInfo, number: e.target.value})}
                       placeholder="1234 5678 9012 3456"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-xs"
                       required
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Expiry Date</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Expiry Date</label>
                       <input
                         type="text"
                         value={cardInfo.expiry}
                         onChange={(e) => setCardInfo({...cardInfo, expiry: e.target.value})}
                         placeholder="MM/YY"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-xs"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">CVV</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">CVV</label>
                       <input
                         type="text"
                         value={cardInfo.cvv}
                         onChange={(e) => setCardInfo({...cardInfo, cvv: e.target.value})}
                         placeholder="123"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-xs"
                         required
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Cardholder Name</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Cardholder Name</label>
                     <input
                       type="text"
                       value={cardInfo.name}
                       onChange={(e) => setCardInfo({...cardInfo, name: e.target.value})}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-xs"
                       required
                     />
                   </div>
@@ -261,73 +243,39 @@ export const CheckoutPage: React.FC = () => {
               )}
 
               {paymentMethod === 'paypal' && (
-                <div className="text-center py-8">
-                  <div className="text-gray-600 mb-4">You will be redirected to PayPal to complete your payment</div>
-                  <div className="text-4xl">💳</div>
+                <div className="text-center py-6">
+                  <div className="text-gray-600 mb-2 text-xs">You will be redirected to PayPal to complete your payment</div>
+                  <div className="text-3xl">💳</div>
                 </div>
               )}
             </div>
           </div>
 
           {/* Right Column - Order Summary */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-lg p-6 sticky top-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Order Summary</h2>
-              
-              {/* Cart Items */}
-              <div className="space-y-4 mb-6">
-                {cartItems.map((item) => (
-                  <div key={item.cart_item_id} className="flex items-center space-x-3">
-                    <img
-                      src={item.image_url}
-                      alt={item.name}
-                      className="w-16 h-16 object-cover rounded-lg"
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
-                      <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
-                    </div>
-                    <div className="font-bold text-gray-900">
-                      ${(item.price * item.quantity).toFixed(2)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Totals */}
-              <div className="border-t pt-4 space-y-3">
-                <div className="flex justify-between text-gray-600">
-                  <span>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Shipping</span>
-                  <span>{shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Tax</span>
-                  <span>${tax.toFixed(2)}</span>
-                </div>
-                <div className="border-t pt-3 flex justify-between text-xl font-bold text-gray-900">
-                  <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
-                </div>
-              </div>
-
-              {/* Place Order Button */}
-              <button
-                onClick={handleSubmit}
-                className="w-full mt-6 bg-[#ffc220] text-black font-bold py-4 px-6 rounded-full hover:bg-yellow-300 transition-colors shadow-lg text-lg"
-              >
-                Place Order
-              </button>
-
-              {/* Security Notice */}
-              <div className="mt-4 text-xs text-gray-500 text-center">
-                <Lock className="h-4 w-4 inline mr-1" />
-                Your payment information is secure and encrypted
-              </div>
+          <div className="bg-white rounded-xl shadow p-3 space-y-3">
+            <h2 className="text-base font-bold text-gray-900 mb-2">Order Summary</h2>
+            <div className="flex items-center justify-between text-xs">
+              <span>Subtotal</span>
+              <span>${subtotal.toFixed(2)}</span>
             </div>
+            <div className="flex items-center justify-between text-xs">
+              <span>Shipping</span>
+              <span>{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span>Tax</span>
+              <span>${tax.toFixed(2)}</span>
+            </div>
+            <div className="border-t pt-2 flex items-center justify-between text-base font-bold">
+              <span>Total</span>
+              <span className="text-[#0071ce]">${total.toFixed(2)}</span>
+            </div>
+            <button
+              onClick={handleSubmit}
+              className="w-full bg-[#ffc220] text-black py-2 px-4 rounded-full font-bold text-sm hover:bg-yellow-300 transition-colors shadow"
+            >
+              Pay Now
+            </button>
           </div>
         </div>
       </div>

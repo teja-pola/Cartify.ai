@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Header } from './components/Header'
 import { HeroBanner } from './components/HeroBanner'
 import { ProductGrid } from './components/ProductGrid'
@@ -22,7 +22,7 @@ function HomePage() {
 }
 
 function App() {
-  const { loadProducts, setUser } = useStore()
+  const { loadProducts, setUser, user } = useStore()
 
   useEffect(() => {
     // Load initial data
@@ -58,10 +58,13 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/checkout" element={<CheckoutPage />} />
-        </Routes>
+       
+        <main className="flex-grow">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/checkout" element={user ? <CheckoutPage /> : <Navigate to="/" />} />
+          </Routes>
+        </main>
       </div>
     </Router>
   )
