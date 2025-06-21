@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Search, ShoppingCart, User, Menu, MapPin, Heart, ChevronDown, X, BarChart3, Home, Tag } from 'lucide-react'
+import { Search, ShoppingCart, User, Menu, MapPin, Heart, ChevronDown, X,  Home, Tag } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { AuthModal } from './AuthModal'
 import { CartModal } from './CartModal'

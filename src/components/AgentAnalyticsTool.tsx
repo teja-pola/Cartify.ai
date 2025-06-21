@@ -6,295 +6,261 @@ import {
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 
-const topSearchedProducts = [
-  { name: 'Basmati Rice', value: 120 },
-  { name: 'Chicken', value: 90 },
-  { name: 'Paneer', value: 80 },
-  { name: 'Shampoo', value: 60 },
-  { name: 'Chips', value: 50 },
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A020F0', '#FF6384', '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'];
+
+const TIME_FILTERS = [
+  { label: '1 Day', value: '1d' },
+  { label: '1 Week', value: '1w' },
+  { label: '1 Month', value: '1m' },
+  { label: '1 Year', value: '1y' },
 ];
 
-// Mock Data Generation
-const generateMockData = () => {
-  const mockCategorySales = [
-    { name: 'Grocery', value: 45000 },
-    { name: 'Electronics', value: 30000 },
-    { name: 'Fashion', value: 18000 },
-    { name: 'Home', value: 22000 },
-    { name: 'Pharmacy', value: 9000 },
-  ];
+const CATEGORY_FILTERS = [
+  { label: 'All Categories', value: 'all' },
+  // Add more categories as needed
+];
 
-  const mockDepartmentPopularity = [
-    { department: 'Grocery', orders: 150 },
-    { department: 'Electronics', orders: 80 },
-    { department: 'Home', orders: 120 },
-    { department: 'Fashion', orders: 95 },
-  ];
-
-  const mockSalesOverTime = Array.from({ length: 15 }, (_, i) => {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    return {
-      date: date.toISOString().slice(0, 10),
-      sales: Math.floor(Math.random() * (30000 - 5000 + 1)) + 5000,
-    };
-  }).reverse();
-
-  const mockCartValueDistribution = [
-    { range: '0-200', count: 50 },
-    { range: '200-500', count: 85 },
-    { range: '500-1000', count: 40 },
-    { range: '1000-2000', count: 15 },
-    { range: '2000+', count: 5 },
-  ];
-  
-  const mockKpi = {
-    salesToday: mockSalesOverTime[mockSalesOverTime.length - 1]?.sales || 0,
-    ordersToday: Math.floor(Math.random() * 20) + 10,
-    avgOrderValue: 450,
-    newCustomers: 5,
-    returningCustomers: 25,
-  };
-
-  return { mockKpi, mockCategorySales, mockDepartmentPopularity, mockSalesOverTime, mockCartValueDistribution };
-};
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A020F0', '#FF6384'];
+function getDateRange(filter: string) {
+  const now = new Date();
+  let from: Date;
+  switch (filter) {
+    case '1d': from = new Date(now); from.setDate(now.getDate() - 1); break;
+    case '1w': from = new Date(now); from.setDate(now.getDate() - 7); break;
+    case '1m': from = new Date(now); from.setMonth(now.getMonth() - 1); break;
+    case '1y': from = new Date(now); from.setFullYear(now.getFullYear() - 1); break;
+    default: from = new Date(0);
+  }
+  return from.toISOString();
+}
 
 export const AgentAnalyticsTool: React.FC = () => {
-  const [kpiData, setKpiData] = useState<any>({});
-  const [categorySales, setCategorySales] = useState<any[]>([]);
-  const [departmentPopularity, setDepartmentPopularity] = useState<any[]>([]);
-  const [salesOverTime, setSalesOverTime] = useState<any[]>([]);
-  const [cartValueDistribution, setCartValueDistribution] = useState<any[]>([]);
-  const [inventoryAlerts, setInventoryAlerts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
   const { products } = useStore();
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [searches, setSearches] = useState<any[]>([]); // For top searched products
+  const [isLoading, setIsLoading] = useState(true);
+  const [timeFilter, setTimeFilter] = useState('1w');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [purchaseFilter, setPurchaseFilter] = useState(false); // true = most purchased, false = most searched
 
+  // Fetch real data
   useEffect(() => {
-    const fetchAnalyticsData = async () => {
+    async function fetchData() {
       setIsLoading(true);
-      const { data: cartItems, error } = await supabase.from('cart_items').select('*');
-
-      if (error) {
-        console.error('Error fetching cart items for analytics:', error);
-        // On error, use mock data
-        const { mockKpi, mockCategorySales, mockDepartmentPopularity, mockSalesOverTime, mockCartValueDistribution } = generateMockData();
-        setKpiData(mockKpi);
-        setCategorySales(mockCategorySales);
-        setDepartmentPopularity(mockDepartmentPopularity);
-        setSalesOverTime(mockSalesOverTime);
-        setCartValueDistribution(mockCartValueDistribution);
-        setIsLoading(false);
-        return;
-      }
-
-      // If real data exists, process it
-      if (cartItems && cartItems.length > 0 && products.length > 0) {
-        // KPI Data
-        const today = new Date().toISOString().slice(0, 10);
-        const todaysItems = cartItems.filter(item => item.created_at.slice(0, 10) === today);
-        const totalSalesToday = todaysItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-        setKpiData({
-          salesToday: totalSalesToday,
-          ordersToday: new Set(todaysItems.map(item => item.user_id)).size,
-          avgOrderValue: todaysItems.length ? totalSalesToday / new Set(todaysItems.map(item => item.user_id)).size : 0,
-          newCustomers: 0, // Placeholder
-          returningCustomers: 0, // Placeholder
-        });
-
-        // Category Sales & Department Popularity
-        const categoryData: Record<string, { value: number; orders: number }> = {};
-        cartItems.forEach(item => {
-          const productDetails = products.find(p => p.id === item.product_id);
-          const category = productDetails?.category_id || 'uncategorized';
-          if (!categoryData[category]) {
-            categoryData[category] = { value: 0, orders: 0 };
-          }
-          categoryData[category].value += item.price * item.quantity;
-          categoryData[category].orders += 1;
-        });
-        setCategorySales(Object.entries(categoryData).map(([name, { value }]) => ({ name, value })));
-        setDepartmentPopularity(Object.entries(categoryData).map(([department, { orders }]) => ({ department, orders })));
-
-        // Sales Over Time
-        const salesByDate: Record<string, number> = {};
-        cartItems.forEach(item => {
-          const date = item.created_at.slice(0, 10);
-          if (!salesByDate[date]) {
-            salesByDate[date] = 0;
-          }
-          salesByDate[date] += item.price * item.quantity;
-        });
-        setSalesOverTime(Object.entries(salesByDate).map(([date, sales]) => ({ date, sales })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-        
-        // Cart Value Distribution
-        const orderValues: Record<string, number> = {};
-        cartItems.forEach(item => {
-            if(!orderValues[item.user_id]) orderValues[item.user_id] = 0;
-            orderValues[item.user_id] += item.price * item.quantity;
-        });
-
-        const buckets = { '0-200': 0, '200-500': 0, '500-1000': 0, '1000-2000': 0, '2000+': 0 };
-        Object.values(orderValues).forEach(val => {
-            if (val <= 200) buckets['0-200']++;
-            else if (val <= 500) buckets['200-500']++;
-            else if (val <= 1000) buckets['500-1000']++;
-            else if (val <= 2000) buckets['1000-2000']++;
-            else buckets['2000+']++;
-        });
-        setCartValueDistribution(Object.entries(buckets).map(([range, count]) => ({range, count})));
-
-
-        // Inventory Alerts
-        const lowStockCount = products.filter(p => p.stock_quantity < 10).length;
-        setInventoryAlerts([
-          { name: 'Low Stock', value: lowStockCount },
-          { name: 'Fully Stocked', value: products.length - lowStockCount },
-        ]);
-      } else {
-        // If no real data, use mock data
-        const { mockKpi, mockCategorySales, mockDepartmentPopularity, mockSalesOverTime, mockCartValueDistribution } = generateMockData();
-        setKpiData(mockKpi);
-        setCategorySales(mockCategorySales);
-        setDepartmentPopularity(mockDepartmentPopularity);
-        setSalesOverTime(mockSalesOverTime);
-        setCartValueDistribution(mockCartValueDistribution);
-        
-        // Mock inventory data
-        const lowStockCount = products.filter(p => p.stock_quantity < 10).length;
-        setInventoryAlerts([
-          { name: 'Low Stock', value: lowStockCount || 15 },
-          { name: 'Fully Stocked', value: (products.length - lowStockCount) || 185 },
-        ]);
-      }
+      // Fetch cart items
+      const { data: cartData } = await supabase.from('cart_items').select('*');
+      setCartItems(cartData || []);
+      // Fetch searches (if you have a table for this)
+      // const { data: searchData } = await supabase.from('searches').select('*');
+      // setSearches(searchData || []);
       setIsLoading(false);
-    };
-
-    if (products.length > 0) {
-      fetchAnalyticsData();
     }
+    fetchData();
   }, [products]);
-  
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-[#0071ce]"></div>
-      </div>
-    );
+
+  // --- Top Products Searched (mocked if no real data) ---
+  let topProducts: any[] = [];
+  if (searches.length > 0) {
+    // Real logic: filter by time/category, count searches, sort, group by category, etc.
+    // For now, fallback to mock
+  }
+  if (topProducts.length === 0) {
+    // Mock: 2 categories, 5-10 products each
+    topProducts = [
+      { category: 'Grocery', products: [
+        { name: 'Basmati Rice', value: 120 },
+        { name: 'Chicken', value: 90 },
+        { name: 'Paneer', value: 80 },
+        { name: 'Shampoo', value: 60 },
+        { name: 'Chips', value: 50 },
+      ]},
+      { category: 'Electronics', products: [
+        { name: 'Headphones', value: 110 },
+        { name: 'Smartphone', value: 95 },
+        { name: 'Laptop', value: 70 },
+        { name: 'Charger', value: 60 },
+        { name: 'Power Bank', value: 55 },
+      ]},
+    ];
+  }
+
+  // --- Sales by Category ---
+  let categorySales: any[] = [];
+  if (cartItems.length > 0 && products.length > 0) {
+    const categoryMap: Record<string, { name: string, value: number }> = {};
+    cartItems.forEach(item => {
+      const product = products.find(p => p.id === item.product_id);
+      const category = product?.category_id || 'Uncategorized';
+      const categoryName = category.charAt(0).toUpperCase() + category.slice(1);
+      if (!categoryMap[category]) categoryMap[category] = { name: categoryName, value: 0 };
+      categoryMap[category].value += item.price * item.quantity;
+    });
+    categorySales = Object.values(categoryMap).filter(c => c.name !== 'Uncategorized' && c.name !== 'Walmart');
+  }
+  if (categorySales.length === 0) {
+    categorySales = [
+      { name: 'Grocery', value: 45000 },
+      { name: 'Electronics', value: 30000 },
+      { name: 'Fashion', value: 18000 },
+      { name: 'Home', value: 22000 },
+      { name: 'Beauty', value: 9000 },
+      { name: 'Accessories', value: 7000 },
+    ];
+  }
+
+  // --- Sales Over Time ---
+  let salesOverTime: any[] = [];
+  if (cartItems.length > 0) {
+    const salesByDate: Record<string, number> = {};
+    cartItems.forEach(item => {
+      const date = item.created_at.slice(0, 10);
+      if (!salesByDate[date]) salesByDate[date] = 0;
+      salesByDate[date] += item.price * item.quantity;
+    });
+    salesOverTime = Object.entries(salesByDate).map(([date, sales]) => ({ date, sales })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }
+  if (salesOverTime.length === 0) {
+    const now = new Date();
+    salesOverTime = Array.from({ length: 15 }, (_, i) => {
+      const date = new Date(now);
+      date.setDate(now.getDate() - (14 - i));
+      return {
+        date: date.toISOString().slice(0, 10),
+        sales: Math.floor(Math.random() * (30000 - 5000 + 1)) + 5000,
+      };
+    });
+  }
+
+  // --- Cart Value Distribution ---
+  let cartValueDistribution: any[] = [];
+  if (cartItems.length > 0) {
+    const orderValues: Record<string, number> = {};
+    cartItems.forEach(item => {
+      if (!orderValues[item.user_id]) orderValues[item.user_id] = 0;
+      orderValues[item.user_id] += item.price * item.quantity;
+    });
+    const buckets = { '0-200': 0, '200-500': 0, '500-1000': 0, '1000-2000': 0, '2000+': 0 };
+    Object.values(orderValues).forEach(val => {
+      if (val <= 200) buckets['0-200']++;
+      else if (val <= 500) buckets['200-500']++;
+      else if (val <= 1000) buckets['500-1000']++;
+      else if (val <= 2000) buckets['1000-2000']++;
+      else buckets['2000+']++;
+    });
+    cartValueDistribution = Object.entries(buckets).map(([range, count]) => ({ range, count }));
+  }
+  if (cartValueDistribution.length === 0) {
+    cartValueDistribution = [
+      { range: '0-200', count: 50 },
+      { range: '200-500', count: 85 },
+      { range: '500-1000', count: 40 },
+      { range: '1000-2000', count: 15 },
+      { range: '2000+', count: 5 },
+    ];
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-2 sm:px-6 lg:px-12">
-      <h1 className="text-3xl sm:text-4xl font-bold text-center mb-8 text-[#0071ce]">Agent Analytics Tool</h1>
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-        <KpiCard label="Today's Sales" value={`₹${kpiData.salesToday?.toLocaleString('en-IN', { maximumFractionDigits: 2 }) || '0'}`} color="bg-blue-100 text-blue-800" />
-        <KpiCard label="Orders Today" value={kpiData.ordersToday || 0} color="bg-green-100 text-green-800" />
-        <KpiCard label="Avg. Order Value" value={`₹${kpiData.avgOrderValue?.toLocaleString('en-IN', { maximumFractionDigits: 2 }) || '0'}`} color="bg-yellow-100 text-yellow-800" />
-        <KpiCard label="New vs Returning" value={`${kpiData.newCustomers || 0} / ${kpiData.returningCustomers || 0}`} color="bg-purple-100 text-purple-800" />
+    <div className="min-h-screen bg-gray-50 py-4 px-1 sm:px-4 lg:px-8 max-w-screen-lg mx-auto">
+      <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6 text-[#0071ce]">Agent Analytics Dashboard</h1>
+      {/* Top Section: Two Columns */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        {/* Left: Top Products Searched */}
+        <div className="bg-white rounded-xl shadow p-3 flex flex-col">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-bold text-gray-800">Top Products Searched</h2>
+            {/* Filters */}
+            <div className="flex flex-wrap gap-1">
+              {TIME_FILTERS.map(f => (
+                <button
+                  key={f.value}
+                  onClick={() => setTimeFilter(f.value)}
+                  className={`px-2 py-1 rounded-full text-xs font-semibold border transition-colors ${timeFilter === f.value ? 'bg-[#0071ce] text-white border-[#0071ce]' : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'}`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 mb-2">
+            <select
+              className="border rounded px-2 py-1 text-xs"
+              value={categoryFilter}
+              onChange={e => setCategoryFilter(e.target.value)}
+            >
+              <option value="all">All Categories</option>
+              {topProducts.map(cat => (
+                <option key={cat.category} value={cat.category}>{cat.category}</option>
+              ))}
+            </select>
+            <button
+              className={`px-2 py-1 rounded-full text-xs font-semibold border transition-colors ${purchaseFilter ? 'bg-[#0071ce] text-white border-[#0071ce]' : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'}`}
+              onClick={() => setPurchaseFilter(p => !p)}
+            >
+              {purchaseFilter ? 'Most Purchased' : 'Most Searched'}
+            </button>
+          </div>
+          {/* List of Top Products */}
+          <div className="flex-1 overflow-y-auto">
+            {(categoryFilter === 'all' ? topProducts : topProducts.filter(c => c.category === categoryFilter)).map(cat => (
+              <div key={cat.category} className="mb-2">
+                <h3 className="font-semibold text-gray-700 mb-1 text-xs">{cat.category}</h3>
+                <ul className="space-y-1">
+                  {cat.products.slice(0, 10).map((p: any, idx: number) => (
+                    <li key={p.name} className="flex items-center justify-between text-xs">
+                      <span className="truncate">{idx + 1}. {p.name}</span>
+                      <span className="font-bold text-[#0071ce]">{p.value}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Right: Sales by Category */}
+        <div className="bg-white rounded-xl shadow p-3 flex flex-col items-center justify-center">
+          <h2 className="text-lg font-bold text-gray-800 mb-2">Sales by Category</h2>
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie data={categorySales} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label fontSize={10}>
+                {categorySales.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString('en-US')}`} />
+              <RechartsLegend wrapperStyle={{ fontSize: '12px' }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
       </div>
-
-      {/* Category Sales Pie Chart */}
-      <Section title="Sales by Category (Department)">
-        <ResponsiveContainer width="100%" height={320}>
-          <PieChart>
-            <Pie data={categorySales} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={110} label>
-              {categorySales.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <RechartsTooltip formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`} />
-            <RechartsLegend />
-          </PieChart>
-        </ResponsiveContainer>
-      </Section>
-
-      {/* Top Searched Products Pie Chart */}
-      <Section title="Top Searched Products/Dishes">
-        <ResponsiveContainer width="100%" height={320}>
-          <PieChart>
-            <Pie data={topSearchedProducts} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={110} label>
-              {topSearchedProducts.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <RechartsTooltip />
-            <RechartsLegend />
-          </PieChart>
-        </ResponsiveContainer>
-      </Section>
-
-      {/* Popular Departments Bar Chart */}
-      <Section title="Popular Departments">
-        <ResponsiveContainer width="100%" height={320}>
-          <BarChart data={departmentPopularity} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="department" />
-            <YAxis />
-            <RechartsTooltip />
-            <Bar dataKey="orders" fill="#0071ce" />
-          </BarChart>
-        </ResponsiveContainer>
-      </Section>
-
-      {/* Sales Over Time Line Chart */}
-      <Section title="Sales Over Time">
-        <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={salesOverTime} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis />
-            <RechartsTooltip formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`} />
-            <Line type="monotone" dataKey="sales" stroke="#00C49F" strokeWidth={3} />
-          </LineChart>
-        </ResponsiveContainer>
-      </Section>
-
-      {/* Cart Value Distribution Histogram */}
-      <Section title="Cart Value Distribution">
-        <ResponsiveContainer width="100%" height={320}>
-          <BarChart data={cartValueDistribution} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="range" />
-            <YAxis />
-            <RechartsTooltip />
-            <Bar dataKey="count" fill="#FFBB28" />
-          </BarChart>
-        </ResponsiveContainer>
-      </Section>
-
-      {/* Inventory Alerts Donut Chart */}
-      <Section title="Inventory Alerts">
-        <ResponsiveContainer width="100%" height={320}>
-          <PieChart>
-            <Pie data={inventoryAlerts} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={110} label>
-              {inventoryAlerts.map((entry, index) => (
-                <Cell key={`cell-inv-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <RechartsTooltip />
-            <RechartsLegend />
-          </PieChart>
-        </ResponsiveContainer>
-      </Section>
+      {/* Bottom Section: Sales Over Time & Cart Value Distribution */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Sales Over Time */}
+        <div className="bg-white rounded-xl shadow p-3 flex flex-col">
+          <h2 className="text-lg font-bold text-gray-800 mb-2">Sales Over Time</h2>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={salesOverTime} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" fontSize={10} />
+              <YAxis fontSize={10} />
+              <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString('en-US')}`} />
+              <Line type="monotone" dataKey="sales" stroke="#00C49F" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        {/* Cart Value Distribution */}
+        <div className="bg-white rounded-xl shadow p-3 flex flex-col">
+          <h2 className="text-lg font-bold text-gray-800 mb-2">Cart Value Distribution</h2>
+          <div className="mb-1 text-gray-600 text-xs">This chart shows how many users have carts in each value bucket. It helps you understand how the AI agent is influencing cart sizes and purchase behavior.</div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={cartValueDistribution} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="range" fontSize={10} />
+              <YAxis fontSize={10} />
+              <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString('en-US')}`} />
+              <Bar dataKey="count" fill="#FFBB28" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
-};
-
-// KPI Card Component
-const KpiCard: React.FC<{ label: string; value: string | number; color: string }> = ({ label, value, color }) => (
-  <div className={`rounded-xl shadow-md p-5 flex flex-col items-center justify-center text-center ${color}`}>
-    <div className="text-xl sm:text-2xl font-bold mb-1">{value}</div>
-    <div className="text-sm font-medium">{label}</div>
-  </div>
-);
-
-// Section Wrapper
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <section className="mb-12">
-    <h2 className="text-xl sm:text-2xl font-bold mb-4 text-gray-800">{title}</h2>
-    <div className="bg-white rounded-xl shadow p-4 sm:p-6 lg:p-8">{children}</div>
-  </section>
-); 
+}; 

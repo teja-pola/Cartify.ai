@@ -4,9 +4,9 @@
 
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-
+// @ts-ignore
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-
+// @ts-expect-error Deno is available in the Edge Function runtime
 const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
 const VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Example voice ID, change if needed
 
@@ -26,6 +26,16 @@ serve(async (req) => {
     const formData = await req.formData();
     const audioFile = formData.get('audio');
 
+    console.log('audioFile:', audioFile);
+    if (audioFile) {
+      // @ts-ignore
+      console.log('audioFile type:', audioFile.type);
+      // @ts-ignore
+      console.log('audioFile size:', audioFile.size);
+    } else {
+      console.error('No audio file found in request.');
+    }
+
     if (!audioFile) {
       return new Response(JSON.stringify({ error: 'No audio file found' }), {
         status: 400,
@@ -37,6 +47,7 @@ serve(async (req) => {
     
     const elevenLabsFormData = new FormData();
     elevenLabsFormData.append('file', audioFile);
+    elevenLabsFormData.append('model_id', 'scribe_v1');
 
     const elevenLabsResponse = await fetch(elevenLabsUrl, {
       method: 'POST',
@@ -59,6 +70,7 @@ serve(async (req) => {
       status: 200,
     })
   } catch (error) {
+    console.error('Function error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
