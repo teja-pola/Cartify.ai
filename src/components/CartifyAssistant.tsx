@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Mic, Send, ShoppingCart, Trash2, Plus, Minus, Bot, Sparkles, MicOff } from 'lucide-react'
+import { X, Mic, Send, ShoppingCart, Trash2, Plus, Minus, Bot, Sparkles, MicOff, BarChart3, MessageSquare } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { supabase } from '../lib/supabase'
+import { AgentAnalyticsTool } from './AgentAnalyticsTool'
 
 interface CartifyProduct {
   id: string
@@ -10,6 +11,7 @@ interface CartifyProduct {
   image_url: string
   quantity: number
   reason?: string
+  brand?: string
 }
 
 interface QuickOption {
@@ -26,10 +28,12 @@ export const CartifyAssistant: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false)
   const [suggestedProducts, setSuggestedProducts] = useState<CartifyProduct[]>([])
   const [isListening, setIsListening] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
   const [showQuickOptions, setShowQuickOptions] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
   const [audioChunks, setAudioChunks] = useState<Blob[]>([])
+  const [viewMode, setViewMode] = useState<'chat' | 'analytics'>('chat')
 
   const quickOptions: QuickOption[] = [
     {
@@ -68,6 +72,7 @@ export const CartifyAssistant: React.FC = () => {
 
   useEffect(() => {
     if (cartifyOpen) {
+      setViewMode('chat')
       setMessages([
         {
           type: 'bot',
@@ -89,97 +94,113 @@ export const CartifyAssistant: React.FC = () => {
   }
 
   const handleVoiceInput = async () => {
+    if (isListening) {
+      mediaRecorder?.stop()
+      setIsListening(false)
+      setIsTranscribing(true)
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const recorder = new MediaRecorder(stream)
       setMediaRecorder(recorder)
+      
       const chunks: Blob[] = []
-      setAudioChunks(chunks)
-
       recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data)
-        }
+        if (event.data.size > 0) chunks.push(event.data)
       }
 
       recorder.onstop = async () => {
+        setIsTranscribing(true);
         const audioBlob = new Blob(chunks, { type: 'audio/webm' })
-        const formData = new FormData()
-        formData.append('audio', audioBlob, 'audio.webm')
-        const { data, error } = await supabase.functions.invoke('speechToText', {
-          body: formData,
+        const { data, error } = await supabase.functions.invoke('speech-to-text', {
+          body: audioBlob,
+          headers: { 'Content-Type': 'audio/webm' }
         })
-        console.log('Data from speechToText:', data)
+        
+        setIsTranscribing(false)
         if (error) {
           console.error('Error from speechToText:', error)
-          alert('Failed to transcribe audio')
+          alert(`Transcription failed: ${error.message}`)
           return
         }
         setInput(data.transcription)
-        setIsListening(false)
       }
 
       recorder.start()
       setIsListening(true)
-      setTimeout(() => {
-        recorder.stop()
-      }, 5000)
     } catch (error) {
       console.error('Error accessing microphone:', error)
-      alert('Could not access microphone')
+      alert('Could not access microphone. Please ensure you have given permission.')
     }
+  }
+
+  // Helper to call the Cartify AI Agent edge function
+  async function fetchCartifyAgentResponse(query: string) {
+    const res = await fetch('https://cmpgbcxxekyjtvvcabbw.functions.supabase.co/cartify-agent', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({ query }),
+    });
+    if (!res.ok) throw new Error('Failed to fetch agent response');
+    return await res.json();
   }
 
   const handleSendMessage = async (customInput?: string) => {
-    const userMessage = customInput || input.trim()
-    if (!userMessage) return
+    const userMessage = customInput || input.trim();
+    if (!userMessage) return;
 
-    setInput('')
-    setIsProcessing(true)
-    setShowQuickOptions(false)
+    setInput('');
+    setIsProcessing(true);
+    setShowQuickOptions(false);
 
-    setMessages(prev => [...prev, { type: 'user', content: userMessage }])
+    setMessages(prev => [...prev, { type: 'user', content: userMessage }]);
 
     try {
-      const { data, error } = await supabase.functions.invoke('getSuggestedProducts', {
-        body: { query: userMessage },
-      })
-      console.log('Data from getSuggestedProducts:', data)
-      if (error) {
-        console.error('Error from getSuggestedProducts:', error)
-        throw new Error(error.message)
+      const data = await fetchCartifyAgentResponse(userMessage);
+      // Deduplicate by id and limit to max 3 per name
+      const nameCounts: Record<string, number> = {};
+      const seenIds = new Set();
+      const uniqueLimitedProducts: any[] = [];
+      for (const p of (data.products || [])) {
+        const name = p.name.toLowerCase();
+        if (!seenIds.has(p.id)) {
+          if (!nameCounts[name]) nameCounts[name] = 0;
+          if (nameCounts[name] < 3) {
+            uniqueLimitedProducts.push(p);
+            nameCounts[name]++;
+            seenIds.add(p.id);
+          }
+        }
       }
-      const suggestions = data.products
-      setSuggestedProducts(suggestions.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        image_url: p.image_url,
-        quantity: 1,
-        reason: `Matches your search for "${userMessage}"`
-      })))
-
-      const totalCost = suggestions.reduce((sum: number, p: any) => sum + (p.price * 1), 0)
-      
-      let responseText = `Perfect! I found ${suggestions.length} items that match your needs:\n\n`
-      
-      suggestions.forEach((product: any, index: number) => {
-        responseText += `${index + 1}. ${product.name} - $${product.price.toFixed(2)}\n\n`
-      })
-
-      responseText += `💰 Total: $${totalCost.toFixed(2)}\n\nYou can adjust quantities or remove items you don't need. Click "Add All to Cart" when ready!`
-
-      setMessages(prev => [...prev, { type: 'bot', content: responseText }])
-      
+      setSuggestedProducts(
+        uniqueLimitedProducts.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          image_url: p.image_url,
+          brand: p.brand,
+          quantity: 1,
+          reason: `Matches your request: ${userMessage}`,
+        }))
+      );
+      setMessages(prev => [
+        ...prev,
+        { type: 'bot', content: data.message || 'Here are the best products for you!' },
+      ]);
     } catch (error) {
-      setMessages(prev => [...prev, { 
-        type: 'bot', 
-        content: 'Sorry, I encountered an error processing your request. Please try again!' 
-      }])
+      setMessages(prev => [
+        ...prev,
+        { type: 'bot', content: 'Sorry, I encountered an error processing your request. Please try again!' },
+      ]);
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
     }
-  }
+  };
 
   const updateProductQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -197,12 +218,20 @@ export const CartifyAssistant: React.FC = () => {
 
   const addAllToCart = () => {
     suggestedProducts.forEach(product => {
-      const fullProduct = products.find(p => p.id === product.id)
-      if (fullProduct) {
-        addToCart(fullProduct, product.quantity)
-      }
-    })
-    
+      const productForCart = {
+        ...product,
+        description: product.name,
+        category_id: 'walmart',
+        stock_quantity: 100,
+        rating: 0,
+        review_count: 0,
+        brand: product.brand || 'Walmart',
+        sku: undefined,
+        is_featured: false,
+        original_price: undefined,
+      };
+      addToCart(productForCart, product.quantity);
+    });
     setMessages(prev => [...prev, { 
       type: 'bot', 
       content: `🎉 Perfect! I've added all ${suggestedProducts.length} items to your cart. Happy shopping! 🛒✨\n\nIs there anything else I can help you find?` 
@@ -227,181 +256,199 @@ export const CartifyAssistant: React.FC = () => {
               <p className="text-blue-100 text-sm sm:text-base lg:text-lg">Your intelligent shopping companion</p>
             </div>
           </div>
-          <button
-            onClick={() => setCartifyOpen(false)}
-            className="p-2 sm:p-3 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
-          >
-            <X className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setViewMode(viewMode === 'chat' ? 'analytics' : 'chat')}
+              className="p-2 sm:p-3 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+              title={viewMode === 'chat' ? 'Show Analytics' : 'Show Chat'}
+            >
+              {viewMode === 'chat' ? <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8" /> : <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8" />}
+            </button>
+            <button
+              onClick={() => setCartifyOpen(false)}
+              className="p-2 sm:p-3 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+            >
+              <X className="h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8" />
+            </button>
+          </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 flex min-h-0 flex-col lg:flex-row">
-          {/* Chat Section */}
-          <div className="flex-1 flex flex-col min-h-0">
-            {/* Messages - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-8 space-y-4 sm:space-y-6 bg-gray-50">
-              {messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
+        {/* Content Area - Conditional Rendering */}
+        {viewMode === 'chat' ? (
+          <div className="flex-1 flex flex-col lg:flex-row min-h-0">
+            {/* Chat Section */}
+            <div className="flex-1 flex flex-col min-h-0 lg:border-r">
+              {/* Messages - Scrollable */}
+              <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-8 space-y-4 sm:space-y-6 bg-gray-50">
+                {messages.map((message, index) => (
                   <div
-                    className={`max-w-xs sm:max-w-md lg:max-w-lg px-3 sm:px-4 lg:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl whitespace-pre-line shadow-lg text-sm sm:text-base ${
-                      message.type === 'user'
-                        ? 'bg-[#0071ce] text-white'
-                        : 'bg-white text-gray-900 border-2 border-gray-200'
-                    }`}
+                    key={index}
+                    className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    {message.content}
-                  </div>
-                </div>
-              ))}
-
-              {/* Quick Options */}
-              {showQuickOptions && messages.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-6 sm:mt-8">
-                  {quickOptions.map((option) => (
-                    <button
-                      key={option.id}
-                      onClick={() => handleQuickOption(option.id)}
-                      className="p-3 sm:p-4 lg:p-6 border-2 sm:border-3 border-gray-200 rounded-xl sm:rounded-2xl hover:border-[#0071ce] hover:bg-blue-50 transition-all text-left group shadow-lg bg-white"
+                    <div
+                      className={`max-w-xs sm:max-w-md lg:max-w-lg px-3 sm:px-4 lg:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl whitespace-pre-line shadow-lg text-sm sm:text-base ${
+                        message.type === 'user'
+                          ? 'bg-[#0071ce] text-white'
+                          : 'bg-white text-gray-900 border-2 border-gray-200'
+                      }`}
                     >
-                      <div className="flex items-start space-x-3 sm:space-x-4">
-                        <span className="text-xl sm:text-2xl lg:text-3xl">{option.icon}</span>
-                        <div>
-                          <div className="font-bold text-sm sm:text-base lg:text-lg text-gray-900 group-hover:text-[#0071ce]">
-                            {option.title}
-                          </div>
-                          <div className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">
-                            {option.description}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {isProcessing && (
-                <div className="flex justify-start">
-                  <div className="bg-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl shadow-lg border-2 border-gray-200">
-                    <div className="flex items-center space-x-3">
-                      <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-[#0071ce] animate-spin" />
-                      <span className="text-sm text-gray-600 font-medium">Cartify is thinking...</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Fixed Input Section */}
-            <div className="border-t bg-white p-3 sm:p-4 lg:p-6 flex-shrink-0 shadow-lg">
-              <div className="flex items-center space-x-2 sm:space-x-4">
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    placeholder="Tell me what you need... (e.g., 'I want to cook biryani under $50')"
-                    className="w-full px-4 sm:px-6 py-3 sm:py-4 border-2 border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-sm sm:text-base lg:text-lg"
-                    disabled={isProcessing}
-                  />
-                </div>
-                <button
-                  onClick={handleVoiceInput}
-                  disabled={isListening || isProcessing}
-                  className={`p-3 sm:p-4 rounded-full transition-colors ${
-                    isListening
-                      ? 'bg-red-500 text-white animate-pulse'
-                      : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                  }`}
-                >
-                  {isListening ? <MicOff className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" /> : <Mic className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />}
-                </button>
-                <button
-                  onClick={() => handleSendMessage()}
-                  disabled={!input.trim() || isProcessing}
-                  className="bg-[#0071ce] text-white p-3 sm:p-4 rounded-full hover:bg-[#004c91] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
-                >
-                  <Send className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Suggested Products Panel */}
-          {suggestedProducts.length > 0 && (
-            <div className="w-full lg:w-80 xl:w-96 border-t lg:border-t-0 lg:border-l bg-gray-50 flex flex-col max-h-96 lg:max-h-none">
-              <div className="p-4 sm:p-6 border-b bg-white flex-shrink-0">
-                <h3 className="font-bold text-lg sm:text-xl text-gray-900">Suggested Products</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Total: ${suggestedProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0).toFixed(2)}
-                </p>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4">
-                {suggestedProducts.map((product) => (
-                  <div key={product.id} className="bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 p-3 sm:p-4 relative shadow-lg">
-                    <button
-                      onClick={() => removeProduct(product.id)}
-                      className="absolute top-2 sm:top-3 right-2 sm:right-3 text-gray-400 hover:text-red-500"
-                    >
-                      <X className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </button>
-                    
-                    <img
-                      src={product.image_url}
-                      alt={product.name}
-                      className="w-full h-16 sm:h-20 lg:h-24 object-cover rounded-lg mb-3"
-                    />
-                    
-                    <h4 className="font-bold text-xs sm:text-sm text-gray-900 mb-2 pr-6 sm:pr-8">
-                      {product.name}
-                    </h4>
-                    
-                    {product.reason && (
-                      <p className="text-xs text-gray-600 mb-3">{product.reason}</p>
-                    )}
-                    
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-bold text-[#0071ce] text-sm sm:text-base lg:text-lg">
-                        ${product.price.toFixed(2)}
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => updateProductQuantity(product.id, product.quantity - 1)}
-                          className="p-1 text-gray-500 hover:text-gray-700 bg-gray-100 rounded"
-                        >
-                          <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </button>
-                        <span className="text-sm font-bold px-2">{product.quantity}</span>
-                        <button
-                          onClick={() => updateProductQuantity(product.id, product.quantity + 1)}
-                          className="p-1 text-gray-500 hover:text-gray-700 bg-gray-100 rounded"
-                        >
-                          <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </button>
-                      </div>
+                      {message.content}
                     </div>
                   </div>
                 ))}
+
+                {/* Quick Options */}
+                {showQuickOptions && messages.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-6 sm:mt-8">
+                    {quickOptions.map((option) => (
+                      <button
+                        key={option.id}
+                        onClick={() => handleQuickOption(option.id)}
+                        className="p-3 sm:p-4 lg:p-6 border-2 sm:border-3 border-gray-200 rounded-xl sm:rounded-2xl hover:border-[#0071ce] hover:bg-blue-50 transition-all text-left group shadow-lg bg-white"
+                      >
+                        <div className="flex items-start space-x-3 sm:space-x-4">
+                          <span className="text-xl sm:text-2xl lg:text-3xl">{option.icon}</span>
+                          <div>
+                            <div className="font-bold text-sm sm:text-base lg:text-lg text-gray-900 group-hover:text-[#0071ce]">
+                              {option.title}
+                            </div>
+                            <div className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">
+                              {option.description}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {isProcessing && (
+                  <div className="flex justify-start">
+                    <div className="bg-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl shadow-lg border-2 border-gray-200">
+                      <div className="flex items-center space-x-3">
+                        <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-[#0071ce] animate-spin" />
+                        <span className="text-sm text-gray-600 font-medium">Cartify is thinking...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
-              
-              <div className="p-4 sm:p-6 border-t bg-white flex-shrink-0">
-                <button
-                  onClick={addAllToCart}
-                  className="w-full bg-[#ffc220] text-black font-bold py-3 sm:py-4 px-4 sm:px-6 rounded-full hover:bg-yellow-300 transition-colors flex items-center justify-center space-x-2 sm:space-x-3 shadow-lg text-sm sm:text-base lg:text-lg"
-                >
-                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
-                  <span>Add All to Cart</span>
-                </button>
+
+              {/* Fixed Input Section */}
+              <div className="border-t bg-white p-3 sm:p-4 lg:p-6 flex-shrink-0 shadow-lg">
+                <div className="flex items-center space-x-2 sm:space-x-4">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                      placeholder="Tell me what you need... (e.g., 'I want to cook biryani under $50')"
+                      className="w-full px-4 sm:px-6 py-3 sm:py-4 border-2 border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-sm sm:text-base lg:text-lg"
+                      disabled={isProcessing}
+                    />
+                  </div>
+                  <button
+                    onClick={handleVoiceInput}
+                    disabled={isProcessing || isTranscribing}
+                    className={`p-3 sm:p-4 rounded-full transition-colors ${
+                      isListening
+                        ? 'bg-red-500 text-white animate-pulse'
+                        : isTranscribing
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                    }`}
+                  >
+                    {isListening ? (
+                      <MicOff className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
+                    ) : isTranscribing ? (
+                      <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 animate-spin" />
+                    ) : (
+                      <Mic className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleSendMessage()}
+                    disabled={!input.trim() || isProcessing}
+                    className="bg-[#0071ce] text-white p-3 sm:p-4 rounded-full hover:bg-[#004c91] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+                  >
+                    <Send className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
+                  </button>
+                </div>
               </div>
             </div>
-          )}
-        </div>
+
+            {/* Suggested Products Panel */}
+            {suggestedProducts.length > 0 && (
+              <div className="w-full lg:w-2/5 xl:w-1/3 bg-gray-50 flex flex-col border-t lg:border-t-0">
+                <div className="p-4 sm:p-6 border-b bg-white flex-shrink-0">
+                  <h3 className="font-bold text-lg sm:text-xl text-gray-900">Suggested For You</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Total: ${suggestedProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0).toFixed(2)}
+                  </p>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4">
+                  {suggestedProducts.map((product) => (
+                    <div key={product.id} className="bg-white rounded-lg sm:rounded-xl border-2 border-gray-200 p-3 sm:p-4 flex space-x-4 items-center shadow-lg">
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg"
+                      />
+                      <div className="flex-1">
+                        <h4 className="font-bold text-xs sm:text-sm text-gray-900 mb-1 line-clamp-2">
+                          {product.name}
+                        </h4>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-[#0071ce] text-sm sm:text-base">
+                            ${product.price.toFixed(2)}
+                          </span>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => updateProductQuantity(product.id, product.quantity - 1)}
+                              className="p-1 text-gray-500 hover:text-gray-700 bg-gray-100 rounded"
+                            >
+                              <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </button>
+                            <span className="text-sm font-bold px-1">{product.quantity}</span>
+                            <button
+                              onClick={() => updateProductQuantity(product.id, product.quantity + 1)}
+                              className="p-1 text-gray-500 hover:text-gray-700 bg-gray-100 rounded"
+                            >
+                              <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                       <button
+                        onClick={() => removeProduct(product.id)}
+                        className="text-gray-400 hover:text-red-500 self-start"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="p-4 sm:p-6 border-t bg-white flex-shrink-0">
+                  <button
+                    onClick={addAllToCart}
+                    className="w-full bg-[#ffc220] text-black font-bold py-3 sm:py-4 px-4 sm:px-6 rounded-full hover:bg-yellow-300 transition-colors flex items-center justify-center space-x-2 sm:space-x-3 shadow-lg text-sm sm:text-base lg:text-lg"
+                  >
+                    <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6" />
+                    <span>Add All to Cart</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto">
+            <AgentAnalyticsTool />
+          </div>
+        )}
       </div>
     </div>
   )
