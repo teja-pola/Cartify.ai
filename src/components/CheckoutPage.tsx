@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { ArrowLeft, CreditCard, Lock, Truck, X } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { Link, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 
 export const CheckoutPage: React.FC = () => {
-  const { cartItems, user } = useStore()
+  const { cartItems, user, setCartItems } = useStore()
   const navigate = useNavigate()
   const [paymentMethod, setPaymentMethod] = useState('card')
   const [shippingInfo, setShippingInfo] = useState({
@@ -22,6 +23,9 @@ export const CheckoutPage: React.FC = () => {
     cvv: '',
     name: ''
   })
+  const [paymentSuccess, setPaymentSuccess] = useState(false)
+  const [orderId, setOrderId] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   useEffect(() => {
     // If there's no user or the cart is empty, redirect to home
@@ -30,15 +34,141 @@ export const CheckoutPage: React.FC = () => {
     }
   }, [user, cartItems, navigate])
 
+  useEffect(() => {
+    if (paymentSuccess) {
+      setCartItems([]);
+      if (window.localStorage) {
+        window.localStorage.removeItem('cartify-cart');
+      }
+    }
+  }, [paymentSuccess, setCartItems]);
+
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
   const shipping = subtotal > 35 ? 0 : 5.99
   const tax = subtotal * 0.08
   const total = subtotal + shipping + tax
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Here you would integrate with Stripe or another payment processor
-    alert('Payment processing would be implemented here with Stripe!')
+    if (!user) return;
+    setIsProcessing(true)
+    // Simulate payment processing delay
+    setTimeout(async () => {
+      // Save order to Supabase
+      const { data: order, error } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          total_amount: total,
+          status: 'paid',
+        })
+        .select()
+        .single()
+      if (!error && order) {
+        setOrderId(order.id)
+        // Fetch a valid category_id for new products
+        let categoryId: string | null = null;
+        const { data: defaultCategory } = await supabase
+          .from('categories')
+          .select('id')
+          .eq('name', 'Grocery & Essentials')
+          .single();
+        if (defaultCategory?.id) {
+          categoryId = defaultCategory.id;
+        } else {
+          // fallback: get the first available category
+          const { data: anyCategory } = await supabase
+            .from('categories')
+            .select('id')
+            .limit(1)
+            .single();
+          categoryId = anyCategory?.id || null;
+        }
+        const orderItems = [];
+        for (const item of cartItems) {
+          // Try to find the product by serpapi_id
+          let { data: existing, error: findError } = await supabase
+            .from('products')
+            .select('id')
+            .eq('serpapi_id', item.id)
+            .single();
+          let productId;
+          if (findError || !existing) {
+            // Insert the product if not found
+            const { data: newProduct, error: insertError } = await supabase
+              .from('products')
+              .insert({
+                serpapi_id: item.id, // store SerpAPI product id here
+                name: item.name,
+                description: item.description || item.name,
+                price: item.price,
+                image_url: item.image_url,
+                category_id: categoryId, // always use a valid category_id
+                stock_quantity: item.stock_quantity ?? 100,
+                rating: item.rating ?? 0,
+                review_count: item.review_count ?? 0,
+                brand: item.brand || 'Walmart',
+              })
+              .select('id')
+              .single();
+            if (insertError) {
+              alert('Failed to save product: ' + item.name)
+              setIsProcessing(false)
+              return;
+            }
+            productId = newProduct.id;
+          } else {
+            productId = existing.id;
+          }
+          orderItems.push({
+            order_id: order.id,
+            product_id: productId,
+            quantity: item.quantity,
+            price: item.price,
+          });
+        }
+        await supabase.from('order_items').insert(orderItems)
+        // Delete all cart_items for this user after successful checkout
+        await supabase.from('cart_items').delete().eq('user_id', user.id);
+        setPaymentSuccess(true)
+      } else {
+        alert('Payment failed. Please try again!')
+      }
+      setIsProcessing(false)
+    }, 1500)
+  }
+
+  if (paymentSuccess && user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full flex flex-col items-center">
+          <div className="text-5xl mb-4">🎉</div>
+          <h2 className="text-2xl font-bold text-[#0071ce] mb-2">Payment Successful!</h2>
+          <p className="text-gray-700 mb-4 text-center">Thank you for your purchase. Your order has been placed and is being processed.</p>
+          <div className="w-full border-t pt-4 mt-4">
+            <h3 className="font-bold text-lg mb-2">Order Summary</h3>
+            <ul className="mb-2">
+              {cartItems.map(item => (
+                <li key={item.id} className="flex justify-between text-sm mb-1">
+                  <span>{item.name} x {item.quantity}</span>
+                  <span>${(item.price * item.quantity).toFixed(2)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-between font-bold text-base">
+              <span>Total:</span>
+              <span className="text-[#0071ce]">${total.toFixed(2)}</span>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/')}
+            className="mt-6 w-full bg-[#ffc220] text-black py-2 px-4 rounded-full font-bold text-sm hover:bg-yellow-300 transition-colors shadow"
+          >
+            Continue Shopping
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -273,8 +403,9 @@ export const CheckoutPage: React.FC = () => {
             <button
               onClick={handleSubmit}
               className="w-full bg-[#ffc220] text-black py-2 px-4 rounded-full font-bold text-sm hover:bg-yellow-300 transition-colors shadow"
+              disabled={isProcessing}
             >
-              Pay Now
+              {isProcessing ? 'Processing...' : 'Pay Now'}
             </button>
           </div>
         </div>
