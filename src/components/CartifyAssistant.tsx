@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Mic, Send, ShoppingCart, Trash2, Plus, Minus, Bot, Sparkles, MicOff, BarChart3, MessageSquare } from 'lucide-react'
+import { X, Mic, Send, ShoppingCart, Trash2, Plus, Minus, Bot, Sparkles, MicOff, BarChart3, MessageSquare, Clock } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { supabase } from '../lib/supabase'
 import { AgentAnalyticsTool } from './AgentAnalyticsTool'
+import { useNavigate } from 'react-router-dom'
 
 interface CartifyProduct {
   id: string
@@ -22,7 +23,7 @@ interface QuickOption {
 }
 
 export const CartifyAssistant: React.FC = () => {
-  const { cartifyOpen, setCartifyOpen, addToCart, products } = useStore()
+  const { cartifyOpen, setCartifyOpen, addToCart, products, user } = useStore()
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<Array<{ type: 'user' | 'bot', content: string }>>([])
   const [isProcessing, setIsProcessing] = useState(false)
@@ -33,7 +34,12 @@ export const CartifyAssistant: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
   const [audioChunks, setAudioChunks] = useState<Blob[]>([])
-  const [viewMode, setViewMode] = useState<'chat' | 'analytics'>('chat')
+  const [viewMode, setViewMode] = useState<'chat' | 'analytics' | 'history'>('chat')
+  const [orderHistory, setOrderHistory] = useState<any[]>([])
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
+  const [orderProducts, setOrderProducts] = useState<any[]>([])
+  const [isReordering, setIsReordering] = useState(false)
+  const navigate = useNavigate();
 
   const quickOptions: QuickOption[] = [
     {
@@ -83,6 +89,35 @@ export const CartifyAssistant: React.FC = () => {
       setSuggestedProducts([])
     }
   }, [cartifyOpen])
+
+  useEffect(() => {
+    if (viewMode === 'history' && user) {
+      (async () => {
+        const { data: orders, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+        if (!error && orders) setOrderHistory(orders)
+      })()
+    }
+  }, [viewMode, user])
+
+  useEffect(() => {
+    if (selectedOrder) {
+      (async () => {
+        const { data: items, error } = await supabase
+          .from('order_items')
+          .select('*, product:products(id, name, image_url, brand, price, serpapi_id)')
+          .eq('order_id', selectedOrder.id)
+        if (!error && items) {
+          setOrderProducts(items)
+        }
+      })()
+    } else {
+      setOrderProducts([])
+    }
+  }, [selectedOrder])
 
   const handleQuickOption = (optionId: string) => {
     const option = quickOptions.find(opt => opt.id === optionId)
@@ -251,6 +286,15 @@ export const CartifyAssistant: React.FC = () => {
     setShowQuickOptions(true)
   }
 
+  const handleClearHistory = async () => {
+    if (!user) return;
+    if (!window.confirm('Are you sure you want to clear your entire order history? This cannot be undone.')) return;
+    await supabase.from('orders').delete().eq('user_id', user.id);
+    setOrderHistory([]);
+    setSelectedOrder(null);
+    setOrderProducts([]);
+  };
+
   if (!cartifyOpen) return null
 
   return (
@@ -274,6 +318,13 @@ export const CartifyAssistant: React.FC = () => {
               title={viewMode === 'chat' ? 'Show Analytics' : 'Show Chat'}
             >
               {viewMode === 'chat' ? <BarChart3 className="h-5 w-5" /> : <MessageSquare className="h-5 w-5" />}
+            </button>
+            <button
+              onClick={() => setViewMode(viewMode === 'history' ? 'chat' : 'history')}
+              className={`p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors ${viewMode === 'history' ? 'bg-white bg-opacity-20' : ''}`}
+              title="Show Purchase History"
+            >
+              <Clock className="h-5 w-5" />
             </button>
             <button
               onClick={() => setCartifyOpen(false)}
@@ -455,9 +506,143 @@ export const CartifyAssistant: React.FC = () => {
               </div>
             )}
           </div>
-        ) : (
+        ) : viewMode === 'analytics' ? (
           <div className="flex-1 overflow-y-auto">
             <AgentAnalyticsTool />
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-row min-h-0">
+            {/* Left: Orders List */}
+            <div className="w-2/5 bg-gray-50 border-r flex flex-col overflow-y-auto">
+              <div className="flex items-center justify-between p-3 border-b bg-white">
+                <h3 className="font-bold text-base text-gray-900">Purchase History</h3>
+                <button
+                  onClick={handleClearHistory}
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                  title="Clear History"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              </div>
+              {orderHistory.length === 0 ? (
+                <div className="p-4 text-gray-500 text-sm">No previous purchases found.</div>
+              ) : (
+                <ul className="divide-y">
+                  {orderHistory.map(order => (
+                    <li
+                      key={order.id}
+                      className={`p-3 cursor-pointer hover:bg-blue-50 transition-colors ${selectedOrder?.id === order.id ? 'bg-blue-100' : ''}`}
+                      onClick={() => setSelectedOrder(order)}
+                    >
+                      <div className="font-bold text-xs text-gray-900">{new Date(order.created_at).toLocaleString()}</div>
+                      <div className="text-xs text-gray-600">Total: ${order.total_amount.toFixed(2)}</div>
+                      <div className="text-xs text-gray-500">Status: {order.status}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {/* Right: Products in Selected Order */}
+            <div className="flex-1 flex flex-col">
+              {selectedOrder ? (
+                <>
+                  <div className="p-3 border-b bg-white flex-shrink-0 flex items-center justify-between">
+                    <h3 className="font-bold text-base text-gray-900">Order Details</h3>
+                    <button
+                      onClick={async () => {
+                        setIsReordering(true);
+                        for (const product of orderProducts) {
+                          let productId = product.product && product.product.id;
+                          // Check for existence by serpapi_id
+                          if (product.product && product.product.serpapi_id) {
+                            const { data: existing, error } = await supabase
+                              .from('products')
+                              .select('id')
+                              .eq('serpapi_id', product.product.serpapi_id)
+                              .single();
+                            if (existing && existing.id) {
+                              productId = existing.id;
+                            } else if (!error) {
+                              // Insert if not found
+                              const { data: newProduct } = await supabase
+                                .from('products')
+                                .insert({
+                                  serpapi_id: product.product.serpapi_id,
+                                  name: product.product.name,
+                                  description: product.product.name,
+                                  price: product.product.price,
+                                  image_url: product.product.image_url,
+                                  category_id: product.product.category_id || '',
+                                  stock_quantity: 100,
+                                  rating: 0,
+                                  review_count: 0,
+                                  brand: product.product.brand || 'Walmart',
+                                })
+                                .select('id')
+                                .single();
+                              if (newProduct && newProduct.id) productId = newProduct.id;
+                            }
+                          }
+                          await addToCart({
+                            id: productId,
+                            name: product.product && product.product.name,
+                            price: product.product && product.product.price,
+                            image_url: product.product && product.product.image_url,
+                            brand: product.product && product.product.brand,
+                            description: '',
+                            category_id: '',
+                            stock_quantity: 100,
+                            rating: 0,
+                            review_count: 0,
+                            sku: undefined,
+                            is_featured: false,
+                            original_price: undefined,
+                          }, product.quantity);
+                        }
+                        setIsReordering(false);
+                        navigate('/checkout');
+                      }}
+                      className="bg-[#ffc220] text-black font-bold py-2 px-4 rounded-full hover:bg-yellow-300 transition-colors flex items-center space-x-2 shadow text-xs sm:text-sm"
+                      disabled={isReordering}
+                    >
+                      <ShoppingCart className="h-4 w-4" />
+                      <span>Re-purchase All</span>
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                    {orderProducts.map(product => {
+                      if (!product.product || typeof product.product.price !== 'number') {
+                        console.warn('Missing product or price in order history:', product);
+                      }
+                      return (
+                        <div key={product.id} className="bg-white rounded-lg border border-gray-200 p-2 flex space-x-2 items-center shadow">
+                          <img
+                            src={product.product && product.product.image_url ? product.product.image_url : 'https://via.placeholder.com/64'}
+                            alt={product.product && product.product.name ? product.product.name : 'Product'}
+                            className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-lg"
+                          />
+                          <div className="flex-1">
+                            <h4 className="font-bold text-xs text-gray-900 mb-1 line-clamp-2">
+                              {product.product && product.product.name ? product.product.name : 'Unknown Product'}
+                            </h4>
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-[#0071ce] text-xs sm:text-sm">
+                                {product.product && typeof product.product.price === 'number'
+                                  ? `$${product.product.price.toFixed(2)}`
+                                  : 'N/A'}
+                              </span>
+                              <span className="text-xs font-bold px-1">Qty: {product.quantity}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-gray-400">Select an order to view details</div>
+              )}
+            </div>
           </div>
         )}
       </div>
