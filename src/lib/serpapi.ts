@@ -27,8 +27,8 @@ export interface Product {
 }
 
 export async function fetchWalmartProducts(query: string, page: number = 1): Promise<Product[]> {
-  // Call the local proxy server instead of SerpAPI directly
-  const url = `http://localhost:5175/api/serpapi?query=${encodeURIComponent(query)}&page=${page}`;
+  // Call the Netlify Function instead of the local proxy server
+  const url = `/.netlify/functions/serpapi-proxy?query=${encodeURIComponent(query)}&page=${page}`;
   const response = await axios.get(url);
   const results = response.data?.organic_results || [];
   // Map SerpAPI results to Product interface

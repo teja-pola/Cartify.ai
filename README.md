@@ -92,7 +92,12 @@ Contributions are welcome! Please open issues or pull requests for improvements,
 
 ---
 
+## Netlify Deployment Notes
 
+- The backend SerpAPI proxy is now a Netlify Function at `/.netlify/functions/serpapi-proxy`.
+- The frontend fetches products using this function.
+- The `preinstall` script in `package.json` ensures `npm install --legacy-peer-deps` is used for Netlify compatibility.
+- Set your environment variables (e.g., `SERPAPI_KEY`) in the Netlify dashboard.
 
 ---
 

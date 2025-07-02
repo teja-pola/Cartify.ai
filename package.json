@@ -7,10 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preinstall": "npx npm@9 install --legacy-peer-deps"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.3.0",
+    "@netlify/functions": "^4.1.8",
     "@supabase/supabase-js": "^2.50.0",
     "axios": "^1.10.0",
     "cors": "^2.8.5",

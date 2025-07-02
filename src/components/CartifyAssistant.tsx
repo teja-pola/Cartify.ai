@@ -154,7 +154,7 @@ export const CartifyAssistant: React.FC = () => {
         try {
           const response = await fetch('https://cmpgbcxxekyjtvvcabbw.supabase.co/functions/v1/speech-to-text', {
             method: 'POST',
-            body: formData,
+          body: formData,
             headers: {
               'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtcGdiY3h4ZWt5anR2dmNhYmJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxODY2MDksImV4cCI6MjA2NTc2MjYwOX0.viqdQCnqYnkJ_cgH_tTZoTqXAv9j2gfF1z8Er7F98OE'
             }
@@ -165,7 +165,7 @@ export const CartifyAssistant: React.FC = () => {
             console.error('Error from speechToText:', data.error)
             alert(`Transcription failed: ${data.error}`)
             return;
-          }
+        }
           setInput(data.transcription);
         } catch (error) {
           setIsTranscribing(false);
@@ -225,12 +225,12 @@ export const CartifyAssistant: React.FC = () => {
       }
       setSuggestedProducts(
         uniqueLimitedProducts.map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          price: p.price,
-          image_url: p.image_url,
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        image_url: p.image_url,
           brand: p.brand,
-          quantity: 1,
+        quantity: 1,
           reason: `Matches your request: ${userMessage}`,
         }))
       );
@@ -326,102 +326,102 @@ export const CartifyAssistant: React.FC = () => {
             >
               <Clock className="h-5 w-5" />
             </button>
-            <button
-              onClick={() => setCartifyOpen(false)}
+          <button
+            onClick={() => setCartifyOpen(false)}
               className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
-            >
+          >
               <X className="h-5 w-5" />
-            </button>
+          </button>
           </div>
         </div>
 
         {/* Content Area - Conditional Rendering */}
         {viewMode === 'chat' ? (
           <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-            {/* Chat Section */}
+          {/* Chat Section */}
             <div className="flex-1 flex flex-col min-h-0 lg:border-r">
-              {/* Messages - Scrollable */}
+            {/* Messages - Scrollable */}
               <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-3 bg-gray-50">
-                {messages.map((message, index) => (
+              {messages.map((message, index) => (
+                <div
+                  key={index}
+                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
                   <div
-                    key={index}
-                    className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
                       className={`max-w-xs sm:max-w-md px-2 sm:px-3 py-2 sm:py-3 rounded-xl whitespace-pre-line shadow text-xs sm:text-sm ${
-                        message.type === 'user'
-                          ? 'bg-[#0071ce] text-white'
+                      message.type === 'user'
+                        ? 'bg-[#0071ce] text-white'
                           : 'bg-white text-gray-900 border border-gray-200'
-                      }`}
-                    >
-                      {message.content}
-                    </div>
+                    }`}
+                  >
+                    {message.content}
                   </div>
-                ))}
+                </div>
+              ))}
 
-                {/* Quick Options */}
-                {showQuickOptions && messages.length > 0 && (
+              {/* Quick Options */}
+              {showQuickOptions && messages.length > 0 && (
                   <div className="grid grid-cols-2 gap-2 mt-4">
-                    {quickOptions.map((option) => (
-                      <button
-                        key={option.id}
-                        onClick={() => handleQuickOption(option.id)}
+                  {quickOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => handleQuickOption(option.id)}
                         className="p-2 border border-gray-200 rounded-xl hover:border-[#0071ce] hover:bg-blue-50 transition-all text-left group shadow bg-white"
-                      >
+                    >
                         <div className="flex items-start space-x-2">
                           <span className="text-lg sm:text-xl">{option.icon}</span>
-                          <div>
+                        <div>
                             <div className="font-bold text-xs sm:text-sm text-gray-900 group-hover:text-[#0071ce]">
-                              {option.title}
-                            </div>
+                            {option.title}
+                          </div>
                             <div className="text-xs text-gray-600 mt-1">
-                              {option.description}
-                            </div>
+                            {option.description}
                           </div>
                         </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
 
-                {isProcessing && (
-                  <div className="flex justify-start">
+              {isProcessing && (
+                <div className="flex justify-start">
                     <div className="bg-white px-3 py-2 rounded-xl shadow border border-gray-200">
                       <div className="flex items-center space-x-2">
                         <Sparkles className="h-4 w-4 text-[#0071ce] animate-spin" />
                         <span className="text-xs text-gray-600 font-medium">Cartify AI Agent is thinking...</span>
-                      </div>
                     </div>
                   </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
 
-              {/* Fixed Input Section */}
+            {/* Fixed Input Section */}
               <div className="border-t bg-white p-2 sm:p-3 flex-shrink-0 shadow">
                 <div className="flex items-center space-x-1 sm:space-x-2">
-                  <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                      placeholder="Tell me what you need... (e.g., 'I want to cook biryani under $50')"
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                    placeholder="Tell me what you need... (e.g., 'I want to cook biryani under $50')"
                       className="w-full px-3 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#0071ce] focus:border-transparent text-xs sm:text-sm"
-                      disabled={isProcessing}
-                    />
-                  </div>
-                  <button
-                    onClick={handleVoiceInput}
+                    disabled={isProcessing}
+                  />
+                </div>
+                <button
+                  onClick={handleVoiceInput}
                     disabled={isProcessing || isTranscribing}
                     className={`p-2 rounded-full transition-colors ${
-                      isListening
-                        ? 'bg-red-500 text-white animate-pulse'
+                    isListening
+                      ? 'bg-red-500 text-white animate-pulse'
                         : isTranscribing
                         ? 'bg-yellow-500 text-white'
-                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                    }`}
-                  >
+                      : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  }`}
+                >
                     {isListening ? (
                       <MicOff className="h-4 w-4" />
                     ) : isTranscribing ? (
@@ -429,60 +429,60 @@ export const CartifyAssistant: React.FC = () => {
                     ) : (
                       <Mic className="h-4 w-4" />
                     )}
-                  </button>
-                  <button
-                    onClick={() => handleSendMessage()}
-                    disabled={!input.trim() || isProcessing}
+                </button>
+                <button
+                  onClick={() => handleSendMessage()}
+                  disabled={!input.trim() || isProcessing}
                     className="bg-[#0071ce] text-white p-2 rounded-full hover:bg-[#004c91] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow"
-                  >
+                >
                     <Send className="h-4 w-4" />
-                  </button>
-                </div>
+                </button>
               </div>
             </div>
+          </div>
 
-            {/* Suggested Products Panel */}
-            {suggestedProducts.length > 0 && (
+          {/* Suggested Products Panel */}
+          {suggestedProducts.length > 0 && (
               <div className="w-full lg:w-2/5 xl:w-1/3 bg-gray-50 flex flex-col border-t lg:border-t-0">
                 <div className="p-3 border-b bg-white flex-shrink-0">
                   <h3 className="font-bold text-base text-gray-900">Suggested For You</h3>
                   <p className="text-xs text-gray-600 mt-1">
-                    Total: ${suggestedProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0).toFixed(2)}
-                  </p>
-                </div>
-                
+                  Total: ${suggestedProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0).toFixed(2)}
+                </p>
+              </div>
+              
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                  {suggestedProducts.map((product) => (
+                {suggestedProducts.map((product) => (
                     <div key={product.id} className="bg-white rounded-lg border border-gray-200 p-2 flex space-x-2 items-center shadow">
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
+                    <img
+                      src={product.image_url}
+                      alt={product.name}
                         className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-lg"
-                      />
+                    />
                       <div className="flex-1">
                         <h4 className="font-bold text-xs text-gray-900 mb-1 line-clamp-2">
-                          {product.name}
-                        </h4>
+                      {product.name}
+                    </h4>
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-[#0071ce] text-xs sm:text-sm">
-                            ${product.price.toFixed(2)}
-                          </span>
+                        ${product.price.toFixed(2)}
+                      </span>
                           <div className="flex items-center space-x-1">
-                            <button
-                              onClick={() => updateProductQuantity(product.id, product.quantity - 1)}
-                              className="p-1 text-gray-500 hover:text-gray-700 bg-gray-100 rounded"
-                            >
+                        <button
+                          onClick={() => updateProductQuantity(product.id, product.quantity - 1)}
+                          className="p-1 text-gray-500 hover:text-gray-700 bg-gray-100 rounded"
+                        >
                               <Minus className="h-3 w-3" />
-                            </button>
+                        </button>
                             <span className="text-xs font-bold px-1">{product.quantity}</span>
-                            <button
-                              onClick={() => updateProductQuantity(product.id, product.quantity + 1)}
-                              className="p-1 text-gray-500 hover:text-gray-700 bg-gray-100 rounded"
-                            >
+                        <button
+                          onClick={() => updateProductQuantity(product.id, product.quantity + 1)}
+                          className="p-1 text-gray-500 hover:text-gray-700 bg-gray-100 rounded"
+                        >
                               <Plus className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
+                        </button>
+                      </div>
+                    </div>
                       </div>
                        <button
                         onClick={() => removeProduct(product.id)}
@@ -490,22 +490,22 @@ export const CartifyAssistant: React.FC = () => {
                       >
                         <X className="h-4 w-4" />
                       </button>
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="p-3 border-t bg-white flex-shrink-0">
-                  <button
-                    onClick={addAllToCart}
-                    className="w-full bg-[#ffc220] text-black font-bold py-2 px-4 rounded-full hover:bg-yellow-300 transition-colors flex items-center justify-center space-x-2 shadow text-xs sm:text-sm"
-                  >
-                    <ShoppingCart className="h-4 w-4" />
-                    <span>Add All to Cart</span>
-                  </button>
-                </div>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
+              
+                <div className="p-3 border-t bg-white flex-shrink-0">
+                <button
+                  onClick={addAllToCart}
+                    className="w-full bg-[#ffc220] text-black font-bold py-2 px-4 rounded-full hover:bg-yellow-300 transition-colors flex items-center justify-center space-x-2 shadow text-xs sm:text-sm"
+                >
+                    <ShoppingCart className="h-4 w-4" />
+                  <span>Add All to Cart</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
         ) : viewMode === 'analytics' ? (
           <div className="flex-1 overflow-y-auto">
             <AgentAnalyticsTool />

@@ -133,7 +133,7 @@ export const CheckoutPage: React.FC = () => {
         setPaymentSuccess(true)
       } else {
         alert('Payment failed. Please try again!')
-      }
+  }
       setIsProcessing(false)
     }, 1500)
   }
@@ -385,28 +385,28 @@ export const CheckoutPage: React.FC = () => {
           <div className="bg-white rounded-xl shadow p-3 space-y-3">
             <h2 className="text-base font-bold text-gray-900 mb-2">Order Summary</h2>
             <div className="flex items-center justify-between text-xs">
-              <span>Subtotal</span>
-              <span>${subtotal.toFixed(2)}</span>
-            </div>
+                  <span>Subtotal</span>
+                  <span>${subtotal.toFixed(2)}</span>
+                </div>
             <div className="flex items-center justify-between text-xs">
-              <span>Shipping</span>
+                  <span>Shipping</span>
               <span>{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
-            </div>
+                </div>
             <div className="flex items-center justify-between text-xs">
-              <span>Tax</span>
-              <span>${tax.toFixed(2)}</span>
-            </div>
+                  <span>Tax</span>
+                  <span>${tax.toFixed(2)}</span>
+                </div>
             <div className="border-t pt-2 flex items-center justify-between text-base font-bold">
-              <span>Total</span>
+                  <span>Total</span>
               <span className="text-[#0071ce]">${total.toFixed(2)}</span>
-            </div>
-            <button
-              onClick={handleSubmit}
+              </div>
+              <button
+                onClick={handleSubmit}
               className="w-full bg-[#ffc220] text-black py-2 px-4 rounded-full font-bold text-sm hover:bg-yellow-300 transition-colors shadow"
               disabled={isProcessing}
-            >
+              >
               {isProcessing ? 'Processing...' : 'Pay Now'}
-            </button>
+              </button>
           </div>
         </div>
       </div>
