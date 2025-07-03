@@ -7,8 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "preinstall": "npx npm@9 install --legacy-peer-deps"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.3.0",
@@ -23,7 +22,6 @@
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-mic": "^12.4.6",
     "react-router-dom": "^6.20.1",
     "recharts": "^2.15.3",
     "supabase": "^2.26.9",
@@ -36,7 +34,6 @@
     "@types/express": "^5.0.3",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
-    "@types/react-mic": "^12.4.6",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.18",
     "eslint": "^9.9.1",
