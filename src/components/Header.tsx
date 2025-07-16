@@ -49,11 +49,17 @@ export const Header: React.FC = () => {
           <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Logo and Location */}
             <div className="flex items-center space-x-2 sm:space-x-6">
-              <div className="flex items-center space-x-2 sm:space-x-3">
+              <div className="relative flex items-center space-x-2 sm:space-x-3">
                 <img 
                   src="https://images.icon-icons.com/2699/PNG/512/walmart_logo_icon_170230.png" 
                   alt="Walmart Logo" 
                   className="w-6 h-6 sm:w-8 sm:w-8 md:w-10 md:h-10 object-contain"
+                />
+                <img
+                  src="/black_circle_360x360.png"
+                  alt="Black Circle Badge"
+                  className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 rounded-full border-2 border-white shadow-lg pointer-events-none"
+                  style={{ zIndex: 10 }}
                 />
               </div>
               
