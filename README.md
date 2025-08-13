@@ -57,14 +57,8 @@ npm install
 
 ### 4. Run the Development Server
 ```bash
-npm run dev
+netlify dev
 ```
-
-### 5. Start the backend
-```bash
-npx ts-node src/server/serpapi-proxy.ts
-```
-
 ---
 
 ## 🛠️ Technologies Used
